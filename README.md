@@ -82,6 +82,27 @@ Generates N coarse candidates, post-selects those near the target land area, the
 the SR refiner over the **full canvas in one pass**. Writes georeferenced `.tif` plus
 hillshade / color-relief / shaded-relief PNGs.
 
+### Two-phase workflow: browse coarse drafts, then finish the ones you like
+Stage 1 (coarse) is cheap; the SR finish is the expensive part. So you can mass-produce
+rough drafts, browse them, and only complete your favourites at full resolution.
+```bash
+# STAGE 1 — make many coarse drafts (no SR): saves each draft DEM (.npy) + preview PNG
+#           + a labelled contact_sheet.png for browsing.
+python src/generate.py --config configs/phase1.yaml \
+  --coarse-ckpt checkpoints/phase1/coarse/latest.pt \
+  --coarse-only --n 100 --out outputs/drafts
+
+# ...open outputs/drafts/contact_sheet.png and note the ids you like (e.g. 003, 041)...
+
+# STAGE 2 — finish chosen drafts at full 1536 px via SR (one pass each); add --hydro etc.
+python src/generate.py --config configs/phase1.yaml \
+  --sr-ckpt checkpoints/phase1/sr/latest.pt \
+  --complete outputs/drafts --pick 003 041 --out outputs/final --hydro
+```
+`--pick` matches id substrings (`003`, `coarse_003`, or a seed); omit it to finish all
+drafts. Drafts are saved as exact `.npy` DEMs, so completion reproduces the chosen
+terrain precisely. Coarse drafts are ~2–3 s each; full SR finish is ~2 min/island.
+
 ### Optional hydrological conditioning
 ```bash
 python src/generate.py ... --hydro                 # fill depressions -> drains to sea

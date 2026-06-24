@@ -4,6 +4,26 @@ Each entry: what changed, why, and how metrics/visuals moved. Newest first.
 
 ---
 
+## Feature — two-phase generation: browse coarse drafts, then finish picks
+**Date:** 2026-06-24
+
+Stage-1 (coarse) is cheap (~2–3 s); the SR finish is the cost (~2 min/island). Added a
+browse-then-finish workflow so users mass-produce rough terrain, pick favourites, then
+complete only those at full resolution.
+
+`generate.py` refactored into helpers (`gen_coarse_candidates`, `save_coarse_draft`,
+`contact_sheet`, `finish_island`, `load_drafts`) with three modes:
+- `--coarse-only --n N`: sample N coarse drafts (no SR); save each as `.npy` (exact DEM,
+  to finish later) + preview PNG + a labelled `contact_sheet.png` + `coarse_manifest.json`.
+- `--complete DIR --pick <ids…>`: load chosen drafts and run SR (one full-canvas pass
+  each) → final islands (+ optional `--hydro`). `--pick` matches id substrings; all if omitted.
+- default: unchanged (coarse → post-select → SR).
+
+Verified round-trip: draft 003 (coarse 5521 km²) → finished 5504 km²; draft 001
+(6689) → 6669 — the saved `.npy` reproduces the chosen terrain precisely through SR.
+
+---
+
 ## Feature — optional hydrological conditioning at generation (`--hydro`)
 **Date:** 2026-06-24
 
