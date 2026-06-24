@@ -138,4 +138,3 @@ performed by opening the hillshade PNGs and comparing to real renders.
   Space GmbH 2014–2018 provided under COPERNICUS by the European Union and ESA; all
   rights reserved."* Source: AWS Open Data bucket `copernicus-dem-30m`.
 - Generated DEMs are synthetic (not real locations).
-```

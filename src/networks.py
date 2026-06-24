@@ -73,7 +73,7 @@ class Attn(nn.Module):
         qkv = self.qkv(self.norm(x))
         q, k, v = qkv.reshape(B, 3, self.heads, C // self.heads, H * W).unbind(1)
         q, k, v = (t.transpose(-1, -2) for t in (q, k, v))  # B,heads,HW,dim
-        out = F.scaled_dot_product_attention(q, k, v)
+        out = F.scaled_dot_product_attention(q.contiguous(), k.contiguous(), v.contiguous())
         out = out.transpose(-1, -2).reshape(B, C, H, W)
         return x + self.proj(out)
 

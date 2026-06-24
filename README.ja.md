@@ -141,4 +141,3 @@ python src/validate.py --config configs/phase1.yaml \
   Space GmbH 2014–2018 provided under COPERNICUS by the European Union and ESA; all
   rights reserved."* 取得元:AWS Open Data バケット `copernicus-dem-30m`。
 - 生成されたDEMは合成データであり、実在の場所ではありません。
-```

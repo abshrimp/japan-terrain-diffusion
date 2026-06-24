@@ -12,8 +12,8 @@ data:
   norm: sqrt
 
 geometry:
-  canvas_px: 1536
-  coarse_px: 384
+  canvas_px: 3072
+  coarse_px: 768
   sr_factor: 4
   sr_patch_px: 256
 
@@ -23,8 +23,8 @@ coarse:
   model: {base: 64, ch_mult: [1, 2, 2, 4], num_res: 2, dropout: 0.05, cond_ch: 0, attn: true, grad_ckpt: true, sigma_data: 0.26}
   # Iter 8: MILDER relief (land_lo 0.20, relief_k 1) — Iter 7's land_lo 0.35+rk2 overshot
   # (HI 0.21, beta up to 3.65). Aim HI ~0.17 with minimal beta/KS cost.
-  train: {batch: 8, lr: 1.0e-4, steps: 29000, ema: 0.9995, amp: true,
-          log_every: 100, sample_every: 2000, ckpt_every: 3000, land_lo: 0.20, land_hi: 0.85, relief_k: 1}
+  train: {batch: 8, lr: 1.0e-4, steps: 30000, ema: 0.9995, amp: true,
+          log_every: 100, sample_every: 2000, ckpt_every: 3000, land_lo: 0.08, land_hi: 0.80, relief_k: 1}
   sample: {steps: 48}
 
 # SR: attention-free + reflect pad -> translation-equivariant, full-canvas one pass.
