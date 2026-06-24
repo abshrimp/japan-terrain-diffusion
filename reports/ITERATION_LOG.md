@@ -4,6 +4,27 @@ Each entry: what changed, why, and how metrics/visuals moved. Newest first.
 
 ---
 
+## Feature — optional hydrological conditioning at generation (`--hydro`)
+**Date:** 2026-06-24
+
+**Added** `src/hydro.py` + `generate.py` flags `--hydro` / `--hydro-epsilon` /
+`--hydro-drainage`. The raw diffusion output has spurious closed depressions (~10% of
+land in pits, ~30k strict single-cell sinks per island) — not hydrologically valid.
+
+- `fill_depressions(dem, sea_level, epsilon)`: sea + grid border are outlets.
+  `epsilon=0` → morphological-reconstruction flat fill (~3.5 s; flats remain, breaks D8).
+  `epsilon>0` (default 1e-3 m) → Barnes priority-flood with an epsilon gradient (~7.4 s):
+  fills sinks AND removes flats → fully drainable.
+- `flow_accumulation` (D8) + `drainage_overlay` for a river-network PNG (`--hydro-drainage`).
+
+**Effect (per 1536² island):** ~138k cells raised (mean ~10 m, ≤207 m), strict sinks
+~30k→~300 (≈99% removed); **D8 max flow accumulation 1.5k→~250k cells** (epsilon vs flat)
+— realistic dendritic rivers draining mountain interiors to the coast. Verified: a
+deliberate 940 m synthetic pit is fully removed; `filled ≥ dem` everywhere.
+Default OFF (preserves raw generative output unless requested).
+
+---
+
 ## Iter 7 — close HI (relief sampling) + β (SR noise-schedule re-center)
 **Date:** 2026-06-24 · (design panel: `dem-improve-design` workflow)
 

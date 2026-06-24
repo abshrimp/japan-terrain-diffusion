@@ -82,6 +82,20 @@ Generates N coarse candidates, post-selects those near the target land area, the
 the SR refiner over the **full canvas in one pass**. Writes georeferenced `.tif` plus
 hillshade / color-relief / shaded-relief PNGs.
 
+### Optional hydrological conditioning
+```bash
+python src/generate.py ... --hydro                 # fill depressions -> drains to sea
+python src/generate.py ... --hydro --hydro-drainage # + D8 river-network overlay PNG
+python src/generate.py ... --hydro --hydro-epsilon 0   # flat fill (faster, flats remain)
+```
+`--hydro` makes each generated island **hydrologically consistent**: a priority-flood
+fills spurious sinks and imposes a tiny gradient across flats (`--hydro-epsilon`, default
+1e-3 m) so every land cell drains to the sea (no closed basins, no flats). Typical effect
+on raw output: ~10% of land cells raised (mean ~10 m), strict sinks reduced ~99%, and D8
+flow accumulation rises from ~1.5k to ~250k cells (realistic dendritic river systems).
+`--hydro-drainage` also writes a `*_drainage.png` river overlay. Filling adds ~7 s/island.
+Implemented in `src/hydro.py` (`fill_depressions`, `flow_accumulation`).
+
 ## Validate (statistical + visual)
 ```bash
 python src/validate.py --config configs/phase1.yaml \

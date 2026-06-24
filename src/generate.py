@@ -31,6 +31,7 @@ from networks import UNet  # noqa
 from edm import EDM  # noqa
 from dataset import denormalize, normalize  # noqa
 from render import shaded_relief, hillshade, color_relief, save_png  # noqa
+from hydro import fill_depressions, flow_accumulation, drainage_overlay  # noqa
 
 DST_CRS = ("+proj=lcc +lat_1=33 +lat_2=45 +lat_0=38 +lon_0=137 "
            "+x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
@@ -96,7 +97,18 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="outputs/generated")
     ap.add_argument("--no-ema", action="store_true")
+    ap.add_argument("--hydro", action="store_true",
+                    help="hydrological conditioning: fill depressions so the island "
+                         "drains to the sea (removes spurious sinks)")
+    ap.add_argument("--hydro-epsilon", type=float, default=1e-3,
+                    help="m of drainage gradient imposed across flats (priority-flood). "
+                         "Default 1e-3 (fully drainable). Set 0 for flat fill (faster).")
+    ap.add_argument("--hydro-drainage", action="store_true",
+                    help="also compute D8 flow accumulation and save a river overlay "
+                         "(implies --hydro)")
     args = ap.parse_args()
+    if args.hydro_drainage:
+        args.hydro = True
 
     device = "cuda"
     out = Path(args.out)
@@ -106,6 +118,7 @@ def main():
     vmax = cfg["data"]["vmax"]
     res = cfg["data"]["res_m"]
     nm = cfg["data"].get("norm", "sqrt")
+    sea = cfg["data"].get("sea_thresh", 0.5)
     canvas_px = args.canvas_px or g["canvas_px"]
     coarse_px = canvas_px // (g["canvas_px"] // g["coarse_px"])
     coarse_res = res * (canvas_px // coarse_px)
@@ -162,6 +175,13 @@ def main():
             dem = denormalize(x[0, 0].float().cpu().numpy(), vmax, nm)
         else:
             dem = denormalize(cond[0, 0].float().cpu().numpy(), vmax, nm)
+        # optional hydrological conditioning: fill depressions so the island drains to sea
+        hstats = None
+        if args.hydro:
+            dem, hstats = fill_depressions(dem, sea_level=sea, epsilon=args.hydro_epsilon)
+            print(f"      [hydro] filled {hstats['cells_raised']} cells "
+                  f"({hstats['frac_land_raised']*100:.1f}% of land, mean {hstats['mean_fill_m']:.1f} m, "
+                  f"max {hstats['max_fill_m']:.0f} m); strict sinks {hstats['sinks_before']}->{hstats['sinks_after']}")
         total_km2 = land_km2(dem, res)
         lcc_km2, frac = largest_component_km2(dem, res)
         tag = f"island_{rank:02d}_seed{seed}_{round(lcc_km2)}km2"
@@ -169,11 +189,17 @@ def main():
         save_png(shaded_relief(dem, res=res, vmax=vmax), out / f"{tag}_shaded.png")
         save_png(hillshade(dem, res=res), out / f"{tag}_hillshade.png")
         save_png(color_relief(dem, vmax=vmax), out / f"{tag}_color.png")
-        results.append({"tag": tag, "seed": seed, "island_km2": round(lcc_km2, 1),
-                        "total_land_km2": round(total_km2, 1),
-                        "single_island_frac": round(frac, 2),
-                        "coarse_island_km2": round(km2c, 1),
-                        "elev_max_m": round(float(dem.max()), 1)})
+        if args.hydro_drainage:
+            acc = flow_accumulation(dem, sea_level=sea)
+            save_png(drainage_overlay(dem, acc, sea_level=sea), out / f"{tag}_drainage.png")
+        rec = {"tag": tag, "seed": seed, "island_km2": round(lcc_km2, 1),
+               "total_land_km2": round(total_km2, 1),
+               "single_island_frac": round(frac, 2),
+               "coarse_island_km2": round(km2c, 1),
+               "elev_max_m": round(float(dem.max()), 1)}
+        if hstats:
+            rec["hydro"] = hstats
+        results.append(rec)
         print(f"  [{rank}] {tag}: island {lcc_km2:.0f} km2 "
               f"(total land {total_km2:.0f}, frac {frac:.2f}), max {dem.max():.0f} m")
 
