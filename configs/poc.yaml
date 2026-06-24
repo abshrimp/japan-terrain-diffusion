@@ -1,0 +1,28 @@
+# Phase-0 PoC: tiny/fast end-to-end validation of the whole pipeline.
+# Final canvas 384px @60m = 23 km; coarse 96px @240m; SR x4.
+name: poc
+data:
+  mosaic: data/processed/japan_dem_60m.tif
+  mask: data/processed/japan_landmask_60m.tif
+  res_m: 60.0
+  vmax: 3776.0
+  sea_thresh: 0.5
+  norm: sqrt
+
+geometry:
+  canvas_px: 384
+  coarse_px: 96
+  sr_factor: 4
+  sr_patch_px: 128
+
+coarse:
+  model: {base: 64, ch_mult: [1, 2, 2], num_res: 1, dropout: 0.0, cond_ch: 0, attn: true, sigma_data: 0.26}
+  train: {batch: 32, lr: 2.0e-4, steps: 4000, ema: 0.999, amp: true,
+          log_every: 100, sample_every: 1000, ckpt_every: 1000, land_lo: 0.10, land_hi: 0.85}
+  sample: {steps: 32}
+
+sr:
+  model: {base: 48, ch_mult: [1, 2, 2], num_res: 1, dropout: 0.0, cond_ch: 1, attn: false, sigma_data: 0.14}
+  train: {batch: 32, lr: 2.0e-4, steps: 4000, ema: 0.999, amp: true,
+          log_every: 100, sample_every: 1000, ckpt_every: 1000, land_lo: 0.30, land_hi: 1.0}
+  sample: {steps: 32}

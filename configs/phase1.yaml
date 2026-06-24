@@ -1,0 +1,34 @@
+# Phase-1: full-scale training (sized to fit RTX 2080 Ti 22.5 GB via gradient
+# checkpointing; throughput-tuned for a single GPU).
+# Final canvas 1536px @60m = 92.2 km (8493 km2); coarse 384px @240m; SR x4.
+# Island target ~5000 km2 (~59% land fraction; ocean margin all around).
+name: phase1
+data:
+  mosaic: data/processed/japan_dem_60m.tif
+  mask: data/processed/japan_landmask_60m.tif
+  res_m: 60.0
+  vmax: 3776.0
+  sea_thresh: 0.5
+  norm: sqrt
+
+geometry:
+  canvas_px: 1536
+  coarse_px: 384
+  sr_factor: 4
+  sr_patch_px: 256
+
+# Coarse: WITH attention (deepest level only) + grad checkpointing.
+# 384^2 base64: 11.9 GB train, ~6.8 img/s.
+coarse:
+  model: {base: 64, ch_mult: [1, 2, 2, 4], num_res: 2, dropout: 0.05, cond_ch: 0, attn: true, grad_ckpt: true, sigma_data: 0.26}
+  train: {batch: 8, lr: 1.0e-4, steps: 24000, ema: 0.9995, amp: true,
+          log_every: 100, sample_every: 2000, ckpt_every: 4000, land_lo: 0.10, land_hi: 0.85}
+  sample: {steps: 48}
+
+# SR: attention-free + reflect pad -> translation-equivariant, full-canvas one pass.
+# Trained on 256^2 patches; 16.6 GB train, ~16.7 img/s.
+sr:
+  model: {base: 64, ch_mult: [1, 2, 2, 4], num_res: 2, dropout: 0.0, cond_ch: 1, attn: false, grad_ckpt: true, sigma_data: 0.14}
+  train: {batch: 24, lr: 1.5e-4, steps: 14000, ema: 0.9995, amp: true,
+          log_every: 100, sample_every: 2000, ckpt_every: 4000, land_lo: 0.30, land_hi: 1.0}
+  sample: {steps: 48}

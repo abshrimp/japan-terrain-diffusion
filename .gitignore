@@ -1,0 +1,31 @@
+# --- Python environment & caches ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# --- Model weights (large) ---
+# The trained models ARE present in this folder locally, but are EXCLUDED from git.
+# Reproduce them via training (see README) or attach as a GitHub Release asset / Git LFS.
+*.pt
+*.pth
+*.ckpt
+
+# --- Data (large, regenerable) ---
+# Rebuild with: python src/download_dem.py && python src/preprocess.py
+data/
+*.tif.part
+
+# --- Logs / TensorBoard ---
+logs/
+*.log
+events.out.tfevents.*
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+
+# NOTE: outputs/phase1_final/ (generated island GeoTIFFs + renders) IS tracked
+# as the final deliverable. Remove it from git and use Git LFS if the repo gets heavy.

@@ -1,0 +1,23 @@
+# Core deep learning (CUDA 12.1 wheels; compatible with driver 580 / CUDA 13)
+torch==2.4.1
+torchvision==0.19.1
+# Numerics
+numpy==1.26.4
+scipy==1.13.1
+# Geospatial (rasterio wheel bundles its own GDAL; no system gdal needed)
+rasterio==1.3.10
+pyproj==3.6.1
+shapely==2.0.4
+# Imaging / viz
+matplotlib==3.7.5
+Pillow==10.4.0
+scikit-image==0.21.0
+scikit-learn==1.3.2
+# Distances / metrics
+POT==0.9.4
+# Utilities
+tqdm==4.66.5
+pyyaml==6.0.2
+einops==0.8.0
+tensorboard==2.14.0
+requests==2.32.3
