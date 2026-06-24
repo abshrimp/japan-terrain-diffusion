@@ -7,8 +7,11 @@ Final (shipped) models — present locally, EMA weights only (inference-ready):
 
 | file | stage | step | size |
 |---|---|---|---|
-| `phase1/coarse/coarse_step024000.pt` | coarse (大局) | 24000 | ~73 MB |
+| `phase1/coarse/coarse_step029000.pt` | coarse (大局) | 29000 | ~73 MB |
 | `phase1/sr/sr_step012000.pt`         | SR (詳細)      | 12000 | ~67 MB |
+
+The coarse model uses relief/land-fraction-matched sampling (Iter 8); SR is the 12k
+checkpoint. See `reports/ITERATION_LOG.md` and `reports/RESULTS.md`.
 
 ## How to obtain
 - **Train them** (see top-level `README.md`):
@@ -22,7 +25,7 @@ Final (shipped) models — present locally, EMA weights only (inference-ready):
 ## How to use
 ```
 python src/generate.py --config configs/phase1.yaml \
-  --coarse-ckpt checkpoints/phase1/coarse/coarse_step024000.pt \
+  --coarse-ckpt checkpoints/phase1/coarse/coarse_step029000.pt \
   --sr-ckpt     checkpoints/phase1/sr/sr_step012000.pt \
   --n 24 --keep 6 --target-km2 5000
 ```

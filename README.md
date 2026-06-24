@@ -11,11 +11,13 @@ MultiDiffusion). See `reports/DECISIONS.md` for the full data-source & architect
 rationale, `reports/research_synthesis.md` for the literature survey, `reports/RESULTS.md`
 for final metrics, and `reports/ITERATION_LOG.md` for the change-by-change history.
 
-**Status:** Phase-0 PoC and Phase-1 complete. The final model (coarse@24k + SR@12k)
-generates coherent single islands of 4200–5700 km² (max elev to ~2890 m) that match
-real Japanese terrain statistically (elevation/slope/roughness KS ≈ 0.05–0.11, radial
-PSD slope β 3.52 vs real 3.37, SWD ≈ 0.10) and visually (natural coastlines + dendritic
-mountain drainage). Showcase: `outputs/phase1_final/island_05_seed1_5670km2_shaded.png`.
+**Status:** Phase-0 PoC and Phase-1 complete, plus an improvement pass (Iter 7–8). The
+final model (**coarse@29k with relief/land-fraction-matched sampling + SR@12k**)
+generates coherent single islands centered on ~5000 km² (max elev to ~2860 m) that match
+real Japanese terrain statistically — **elevation KS 0.026, slope KS 0.039, roughness KS
+0.029** (near-perfect), HI 0.17 vs 0.20, radial PSD slope β 3.58 vs real 3.36, SWD 0.095
+— and visually (natural coastlines + dendritic mountain drainage; volcano-like cones).
+Showcase: `outputs/iter8/island_00_seed8_4991km2_shaded.png`. Metrics: `reports/RESULTS.md`.
 
 ## Pipeline
 

@@ -52,8 +52,10 @@ def _avgpool2d(a, f):
 
 
 class TerrainMosaic:
-    """Loads the mosaic + land mask into RAM and builds an integral image."""
-    def __init__(self, mosaic_path, mask_path, sea_thresh=0.5):
+    """Loads the mosaic + land mask into RAM and builds an integral image.
+    build_se=True also builds a float64 elevation integral for relief sampling
+    (~7 GB, ~140 s) — only needed by the coarse stage's relief sampler."""
+    def __init__(self, mosaic_path, mask_path, sea_thresh=0.5, build_se=True):
         with rasterio.open(mosaic_path) as ds:
             self.dem = ds.read(1).astype(np.float32)  # meters, (H,W)
             self.dem[self.dem == ds.nodata] = 0.0
@@ -69,12 +71,27 @@ class TerrainMosaic:
         ii = np.zeros((self.H + 1, self.W + 1), np.int32)
         ii[1:, 1:] = self.mask.cumsum(0, dtype=np.int32).cumsum(1, dtype=np.int32)
         self.ii = ii
-        print(f"[mosaic] {self.H}x{self.W} land_frac={self.mask.mean():.3f}")
+        # elevation integral image (float64: a 1536^2 window sums to ~9e9 > int32 max)
+        # for O(1) mean-land-elevation (relief) queries. Built only when needed.
+        self.se = None
+        if build_se:
+            se = np.zeros((self.H + 1, self.W + 1), np.float64)
+            se[1:, 1:] = self.dem.cumsum(0, dtype=np.float64).cumsum(1, dtype=np.float64)
+            self.se = se
+        print(f"[mosaic] {self.H}x{self.W} land_frac={self.mask.mean():.3f} se={build_se}")
 
     def land_fraction(self, y, x, s):
         ii = self.ii
         total = (ii[y + s, x + s] - ii[y, x + s] - ii[y + s, x] + ii[y, x])
         return total / float(s * s)
+
+    def mean_land_elev(self, y, x, s):
+        """Mean elevation over LAND pixels in the window (ocean=0 adds nothing)."""
+        se = self.se
+        esum = se[y + s, x + s] - se[y, x + s] - se[y + s, x] + se[y, x]
+        ii = self.ii
+        lc = ii[y + s, x + s] - ii[y, x + s] - ii[y + s, x] + ii[y, x]
+        return esum / max(int(lc), 1)
 
     def sample_window(self, size, lo=0.1, hi=0.9, max_try=200, rng=None):
         rng = rng or np.random
@@ -85,6 +102,29 @@ class TerrainMosaic:
             if lo <= frac <= hi:
                 return self.dem[y:y + size, x:x + size]
         # fallback: best-effort, accept whatever (>0 land)
+        return self.dem[y:y + size, x:x + size]
+
+    def sample_window_relief(self, size, lo=0.35, hi=0.85, relief_k=2,
+                             max_try=300, rng=None):
+        """Sample `relief_k` land-valid windows and keep the highest mean-land-elevation
+        (mild relief oversampling). relief_k=1 -> plain land-fraction-matched sampling."""
+        rng = rng or np.random
+        best, best_score, found = None, -1.0, 0
+        for _ in range(max_try):
+            y = rng.randint(0, self.H - size)
+            x = rng.randint(0, self.W - size)
+            if lo <= self.land_fraction(y, x, size) <= hi:
+                score = self.mean_land_elev(y, x, size)
+                if score > best_score:
+                    best_score, best = score, (y, x)
+                found += 1
+                if found >= relief_k:
+                    break
+        if best is None:
+            y = rng.randint(0, self.H - size)
+            x = rng.randint(0, self.W - size)
+            best = (y, x)
+        y, x = best
         return self.dem[y:y + size, x:x + size]
 
 
@@ -100,13 +140,14 @@ def _augment(a, rng):
 
 class CoarseDataset(Dataset):
     def __init__(self, mosaic: TerrainMosaic, canvas_px, coarse_px, vmax=3776.0,
-                 land_lo=0.10, land_hi=0.85, length=20000, norm="sqrt"):
+                 land_lo=0.10, land_hi=0.85, length=20000, norm="sqrt", relief_k=1):
         self.m = mosaic
         self.canvas_px = canvas_px
         self.coarse_px = coarse_px
         self.f = canvas_px // coarse_px
         self.vmax = vmax
         self.norm = norm
+        self.relief_k = relief_k
         self.land_lo, self.land_hi = land_lo, land_hi
         self.length = length
 
@@ -115,7 +156,8 @@ class CoarseDataset(Dataset):
 
     def __getitem__(self, idx):
         rng = np.random.RandomState((idx * 2654435761) % (2**32))
-        win = self.m.sample_window(self.canvas_px, self.land_lo, self.land_hi, rng=rng)
+        win = self.m.sample_window_relief(self.canvas_px, self.land_lo,
+                                          self.land_hi, self.relief_k, rng=rng)
         coarse = _avgpool2d(win, self.f)
         coarse = _augment(coarse, rng)
         x = normalize(coarse, self.vmax, self.norm).astype(np.float32)

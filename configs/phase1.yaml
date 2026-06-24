@@ -21,14 +21,18 @@ geometry:
 # 384^2 base64: 11.9 GB train, ~6.8 img/s.
 coarse:
   model: {base: 64, ch_mult: [1, 2, 2, 4], num_res: 2, dropout: 0.05, cond_ch: 0, attn: true, grad_ckpt: true, sigma_data: 0.26}
-  train: {batch: 8, lr: 1.0e-4, steps: 24000, ema: 0.9995, amp: true,
-          log_every: 100, sample_every: 2000, ckpt_every: 4000, land_lo: 0.10, land_hi: 0.85}
+  # Iter 8: MILDER relief (land_lo 0.20, relief_k 1) — Iter 7's land_lo 0.35+rk2 overshot
+  # (HI 0.21, beta up to 3.65). Aim HI ~0.17 with minimal beta/KS cost.
+  train: {batch: 8, lr: 1.0e-4, steps: 29000, ema: 0.9995, amp: true,
+          log_every: 100, sample_every: 2000, ckpt_every: 3000, land_lo: 0.20, land_hi: 0.85, relief_k: 1}
   sample: {steps: 48}
 
 # SR: attention-free + reflect pad -> translation-equivariant, full-canvas one pass.
 # Trained on 256^2 patches; 16.6 GB train, ~16.7 img/s.
 sr:
+  # NOTE: Iter-7 tried p_mean=-1.7 to lower PSD beta; it did NOT help (reverted).
+  # Final SR is the 12k checkpoint trained with default p_mean=-1.2.
   model: {base: 64, ch_mult: [1, 2, 2, 4], num_res: 2, dropout: 0.0, cond_ch: 1, attn: false, grad_ckpt: true, sigma_data: 0.14}
-  train: {batch: 24, lr: 1.5e-4, steps: 14000, ema: 0.9995, amp: true,
-          log_every: 100, sample_every: 2000, ckpt_every: 4000, land_lo: 0.30, land_hi: 1.0}
+  train: {batch: 24, lr: 1.5e-4, steps: 12000, ema: 0.9995, amp: true,
+          log_every: 100, sample_every: 2000, ckpt_every: 3000, land_lo: 0.30, land_hi: 1.0}
   sample: {steps: 48}

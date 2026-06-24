@@ -1,0 +1,128 @@
+[
+  {
+    "tag": "island_00_seed8_4991km2",
+    "seed": 8,
+    "island_km2": 4990.7,
+    "total_land_km2": 4998.5,
+    "single_island_frac": 1.0,
+    "coarse_island_km2": 5008.8,
+    "elev_max_m": 2207.1
+  },
+  {
+    "tag": "island_01_seed6_4989km2",
+    "seed": 6,
+    "island_km2": 4988.9,
+    "total_land_km2": 5010.7,
+    "single_island_frac": 1.0,
+    "coarse_island_km2": 5015.2,
+    "elev_max_m": 3216.6
+  },
+  {
+    "tag": "island_02_seed30_4849km2",
+    "seed": 30,
+    "island_km2": 4848.7,
+    "total_land_km2": 4852.6,
+    "single_island_frac": 1.0,
+    "coarse_island_km2": 4863.4,
+    "elev_max_m": 2129.4
+  },
+  {
+    "tag": "island_03_seed24_4820km2",
+    "seed": 24,
+    "island_km2": 4819.6,
+    "total_land_km2": 4843.0,
+    "single_island_frac": 1.0,
+    "coarse_island_km2": 4845.7,
+    "elev_max_m": 1660.5
+  },
+  {
+    "tag": "island_04_seed29_5208km2",
+    "seed": 29,
+    "island_km2": 5208.5,
+    "total_land_km2": 5332.1,
+    "single_island_frac": 0.98,
+    "coarse_island_km2": 5218.7,
+    "elev_max_m": 1977.8
+  },
+  {
+    "tag": "island_05_seed9_5302km2",
+    "seed": 9,
+    "island_km2": 5302.0,
+    "total_land_km2": 5306.2,
+    "single_island_frac": 1.0,
+    "coarse_island_km2": 5317.3,
+    "elev_max_m": 1569.8
+  },
+  {
+    "tag": "island_06_seed0_4441km2",
+    "seed": 0,
+    "island_km2": 4440.7,
+    "total_land_km2": 4493.3,
+    "single_island_frac": 0.99,
+    "coarse_island_km2": 4467.6,
+    "elev_max_m": 1524.5
+  },
+  {
+    "tag": "island_07_seed21_5584km2",
+    "seed": 21,
+    "island_km2": 5584.4,
+    "total_land_km2": 5747.6,
+    "single_island_frac": 0.97,
+    "coarse_island_km2": 5615.7,
+    "elev_max_m": 1355.6
+  },
+  {
+    "tag": "island_08_seed1_5674km2",
+    "seed": 1,
+    "island_km2": 5674.5,
+    "total_land_km2": 5681.7,
+    "single_island_frac": 1.0,
+    "coarse_island_km2": 5694.3,
+    "elev_max_m": 2516.7
+  },
+  {
+    "tag": "island_09_seed17_4261km2",
+    "seed": 17,
+    "island_km2": 4261.2,
+    "total_land_km2": 4269.0,
+    "single_island_frac": 1.0,
+    "coarse_island_km2": 4280.3,
+    "elev_max_m": 1645.6
+  },
+  {
+    "tag": "island_10_seed25_5745km2",
+    "seed": 25,
+    "island_km2": 5745.2,
+    "total_land_km2": 5941.0,
+    "single_island_frac": 0.97,
+    "coarse_island_km2": 5764.0,
+    "elev_max_m": 1806.9
+  },
+  {
+    "tag": "island_11_seed18_4427km2",
+    "seed": 18,
+    "island_km2": 4427.4,
+    "total_land_km2": 5493.2,
+    "single_island_frac": 0.81,
+    "coarse_island_km2": 4440.3,
+    "elev_max_m": 1242.4
+  },
+  {
+    "tag": "island_12_seed13_4127km2",
+    "seed": 13,
+    "island_km2": 4127.1,
+    "total_land_km2": 4177.2,
+    "single_island_frac": 0.99,
+    "coarse_island_km2": 4157.0,
+    "elev_max_m": 1789.0
+  },
+  {
+    "tag": "island_13_seed28_4178km2",
+    "seed": 28,
+    "island_km2": 4177.9,
+    "total_land_km2": 4433.6,
+    "single_island_frac": 0.94,
+    "coarse_island_km2": 4194.7,
+    "elev_max_m": 2865.7
+  }
+]

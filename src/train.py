@@ -38,7 +38,8 @@ def build(cfg, stage, device):
                ch_mult=tuple(m["ch_mult"]), num_res=m["num_res"],
                use_attn=m.get("attn", True), dropout=m.get("dropout", 0.0),
                grad_ckpt=m.get("grad_ckpt", False))
-    edm = EDM(net, sigma_data=m.get("sigma_data", 0.5)).to(device)
+    edm = EDM(net, sigma_data=m.get("sigma_data", 0.5),
+              p_mean=m.get("p_mean", -1.2), p_std=m.get("p_std", 1.2)).to(device)
     return edm
 
 
@@ -49,7 +50,8 @@ def make_loader(cfg, stage, mosaic):
     if stage == "coarse":
         ds = CoarseDataset(mosaic, g["canvas_px"], g["coarse_px"],
                            vmax=cfg["data"]["vmax"], norm=norm,
-                           land_lo=tr["land_lo"], land_hi=tr["land_hi"])
+                           land_lo=tr["land_lo"], land_hi=tr["land_hi"],
+                           relief_k=tr.get("relief_k", 1))
     else:
         ds = SRDataset(mosaic, g["sr_patch_px"], g["sr_factor"],
                        vmax=cfg["data"]["vmax"], norm=norm,
@@ -117,7 +119,8 @@ def main():
 
     print(f"[load] mosaic ...")
     mosaic = TerrainMosaic(cfg["data"]["mosaic"], cfg["data"]["mask"],
-                           cfg["data"]["sea_thresh"])
+                           cfg["data"]["sea_thresh"],
+                           build_se=(args.stage == "coarse"))
     dl = make_loader(cfg, args.stage, mosaic)
     it = cycle(dl)
 

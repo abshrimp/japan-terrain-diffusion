@@ -1,0 +1,7 @@
+elevation: KS=0.026 W=20.7m
+slope:     KS=0.039 W=0.65deg
+roughness: KS=0.029 W=0.59
+hypso L1=0.030 HI real/fake=0.20/0.17
+PSD beta real/fake=3.36/3.58 (D 2.32/2.21) curveL2=0.31
+SWD mean=0.0952 per-level=[0.1733, 0.0844, 0.0732, 0.0709, 0.0743]
+land km2 real/fake=5274/5041
