@@ -89,9 +89,10 @@ python src/generate.py --config configs/phase1.yaml \
 N個の粗候補を生成し、目標陸域(約5,000 km²)に近く**単一の連続した島**(最大連結成分で
 後選別)を選び、SRで**全キャンバスを1パス**精緻化。GeoTIFF と hillshade/color/shaded PNG を出力。
 
-### 2段階ワークフロー:粗ドラフトを大量に見てから気に入ったものを仕上げる
-ステージ1(粗)は安価で、SR仕上げが高コストです。そこで、ラフを大量生成して一覧から選び、
-気に入ったものだけをフル解像度で完成させられます。
+## 2段階生成:1段階目だけで粗ドラフトを大量生成 → 一覧で選択 → 仕上げ
+ステージ1(粗)は安価(約2〜3秒/枚)で、SR仕上げが高コストです。そこで、**`--coarse-only`
+で1段階目だけを使ってラフを大量生成**(SRなし)し、一覧(contact_sheet.png)で吟味してから、
+気に入ったものだけを `--complete` でフル解像度に仕上げられます。
 ```bash
 # ステージ1 — 粗ドラフトを大量生成(SRなし):各ドラフトDEM(.npy)+プレビューPNG
 #             + 一覧用 contact_sheet.png を保存。
@@ -110,7 +111,7 @@ python src/generate.py --config configs/phase1.yaml \
 ドラフトは正確な `.npy` DEM として保存されるため、選んだ地形が忠実に再現されます。
 粗ドラフトは約2〜3秒/枚、SR仕上げは約2分/島。
 
-### 任意:水文学的整合性(窪地充填)
+## 水文学的整合性(任意)
 ```bash
 python src/generate.py ... --hydro                  # 窪地を充填し海へ排水可能に
 python src/generate.py ... --hydro --hydro-drainage # + D8河川網オーバーレイPNG
