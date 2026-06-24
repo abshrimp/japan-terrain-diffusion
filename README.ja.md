@@ -135,6 +135,7 @@ python src/validate.py --config configs/phase1.yaml \
 レンダリングと並べて比較することで実施。
 
 ## ライセンス / 出典
+- **コード:** MIT([LICENSE](LICENSE) 参照)。
 - **Copernicus DEM GLO-30** — 出典明記により自由に利用可:
   *"Produced using Copernicus WorldDEM-30 © DLR e.V. 2010–2014 and © Airbus Defence and
   Space GmbH 2014–2018 provided under COPERNICUS by the European Union and ESA; all

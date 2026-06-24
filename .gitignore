@@ -9,9 +9,9 @@ __pycache__/
 # --- Model weights (large) ---
 # The trained models ARE present in this folder locally, but are EXCLUDED from git.
 # Reproduce them via training (see README) or attach as a GitHub Release asset / Git LFS.
-*.pt
-*.pth
-*.ckpt
+# *.pt
+# *.pth
+# *.ckpt
 
 # --- Data (large, regenerable) ---
 # Rebuild with: python src/download_dem.py && python src/preprocess.py

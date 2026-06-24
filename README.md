@@ -132,6 +132,7 @@ renders real-vs-fake montages and PSD/hypsometric curve plots. Visual self-criti
 performed by opening the hillshade PNGs and comparing to real renders.
 
 ## License / attribution
+- **Code:** MIT — see [LICENSE](LICENSE).
 - **Copernicus DEM GLO-30** — free to use with attribution:
   *"Produced using Copernicus WorldDEM-30 © DLR e.V. 2010–2014 and © Airbus Defence and
   Space GmbH 2014–2018 provided under COPERNICUS by the European Union and ESA; all
