@@ -1,5 +1,7 @@
 # Fictional Japanese-Island DEM Generator
 
+**English** | [日本語](README.ja.md)
+
 Learn the terrain of Japan's four main islands (Honshu, Hokkaido, Shikoku, Kyushu;
 **Nansei/Ryukyu excluded**) from real DEM data and **generate realistic fictional
 island elevation models** (~5000 km² land, ~60 m/px) that match real terrain both
