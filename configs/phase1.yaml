@@ -12,8 +12,8 @@ data:
   norm: sqrt
 
 geometry:
-  canvas_px: 3072
-  coarse_px: 768
+  canvas_px: 2176
+  coarse_px: 544
   sr_factor: 4
   sr_patch_px: 256
 
