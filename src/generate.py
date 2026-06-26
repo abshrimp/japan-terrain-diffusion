@@ -128,29 +128,44 @@ def save_coarse_draft(cand, out, coarse_res, vmax):
             "total_km2": round(cand["total_km2"], 1), "npy": f"{tag}.npy"}
 
 
-def contact_sheet(recs, out, coarse_res, vmax, cols=8):
-    """Labelled montage of all coarse drafts for quick visual browsing."""
+def contact_sheet(recs, out, coarse_res, vmax, cols=8, batch_size=100):
+    """Labelled montage of coarse drafts for quick visual browsing, batched per batch_size."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    n = len(recs)
-    cols = min(cols, n)
-    rows = (n + cols - 1) // cols
-    fig, axs = plt.subplots(rows, cols, figsize=(cols * 1.9, rows * 2.1), squeeze=False)
-    axs = axs.ravel()
-    for ax, rec in zip(axs, recs):
-        dem = np.load(out / rec["npy"])
-        ax.imshow(shaded_relief(dem, res=coarse_res, vmax=vmax))
-        ax.set_title(f"{rec['idx']:03d}  {round(rec['lcc_km2'])}km²  f{rec['frac']:.2f}",
-                     fontsize=6)
-        ax.axis("off")
-    for ax in axs[n:]:
-        ax.axis("off")
-    fig.suptitle("coarse drafts — id / largest-island area / single-island fraction",
-                 fontsize=9)
-    fig.tight_layout()
-    fig.savefig(out / "contact_sheet.png", dpi=120)
-    plt.close(fig)
+    
+    for i in range(0, len(recs), batch_size):
+        chunk = recs[i:i + batch_size]
+        n = len(chunk)
+        current_cols = min(cols, n)
+        rows = (n + current_cols - 1) // current_cols
+        
+        fig, axs = plt.subplots(rows, current_cols, figsize=(current_cols * 1.9, rows * 2.1), squeeze=False)
+        axs = axs.ravel()
+        
+        for ax, rec in zip(axs, chunk):
+            dem = np.load(out / rec["npy"])
+            ax.imshow(shaded_relief(dem, res=coarse_res, vmax=vmax))
+            ax.set_title(f"{rec['idx']:03d}  {round(rec['lcc_km2'])}km²  f{rec['frac']:.2f}",
+                         fontsize=6)
+            ax.axis("off")
+            
+        for ax in axs[n:]:
+            ax.axis("off")
+            
+        start_idx = i
+        end_idx = i + n - 1
+        fig.suptitle(f"coarse drafts ({start_idx}-{end_idx}) — id / largest-island area / single-island fraction",
+                     fontsize=9)
+        fig.tight_layout()
+        
+        if len(recs) <= batch_size:
+            filename = "contact_sheet.png"
+        else:
+            filename = f"contact_sheet_{i // batch_size:03d}.png"
+            
+        fig.savefig(out / filename, dpi=120)
+        plt.close(fig)
 
 
 # ----------------------------- SR finishing ----------------------------- #
@@ -285,9 +300,11 @@ def main():
         recs = [save_coarse_draft(c, out, coarse_res, vmax) for c in cands]
         recs.sort(key=lambda r: r["idx"])
         (out / "coarse_manifest.json").write_text(json.dumps(recs, indent=2))
-        contact_sheet(recs, out, coarse_res, vmax)
-        print(f"[coarse-only] wrote {len(recs)} drafts + contact_sheet.png to {out}\n"
-              f"  browse contact_sheet.png, then finish picks with:\n"
+        contact_sheet(recs, out, coarse_res, vmax, batch_size=100)
+        
+        sheet_name = "contact_sheet.png" if len(recs) <= 100 else "contact_sheet_*.png"
+        print(f"[coarse-only] wrote {len(recs)} drafts + {sheet_name} to {out}\n"
+              f"  browse {sheet_name}, then finish picks with:\n"
               f"  python src/generate.py --config {args.config} --sr-ckpt <sr.pt> "
               f"--complete {out} --pick <ids...> --out outputs/final")
         return
