@@ -43,26 +43,53 @@ class EDM(nn.Module):
     def sample(self, shape, device, cond=None, steps=32, sigma_min=0.002,
                sigma_max=80.0, rho=7.0, S_churn=0.0, S_min=0.0, S_max=float("inf"),
                S_noise=1.0, seed=None):
+        
         if seed is not None:
-            g = torch.Generator(device=device).manual_seed(seed)
-            x = torch.randn(shape, device=device, generator=g) * sigma_max
+            B = shape[0]
+            single_shape = (1,) + tuple(shape[1:])
+            x_list = []
+            generators = []
+            
+            if isinstance(seed, (list, tuple)):
+                seeds = seed
+                assert len(seeds) == B, "List of seeds must match batch size (shape[0])"
+            else:
+                seeds = [seed + b for b in range(B)]
+                
+            for s in seeds:
+                g = torch.Generator(device=device).manual_seed(s)
+                generators.append(g)
+                x_list.append(torch.randn(single_shape, device=device, generator=g))
+            
+            x = torch.cat(x_list, dim=0) * sigma_max
         else:
             x = torch.randn(shape, device=device) * sigma_max
+            generators = None
+            
         i = torch.arange(steps, device=device)
         t = (sigma_max ** (1 / rho) + i / (steps - 1) *
              (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
         t = torch.cat([t, torch.zeros_like(t[:1])])  # t[N]=0
+        
         for j in range(steps):
             s_cur, s_next = t[j], t[j + 1]
             gamma = (min(S_churn / steps, np.sqrt(2) - 1)
                      if S_min <= s_cur <= S_max else 0.0)
             s_hat = s_cur * (1 + gamma)
+            
             if gamma > 0:
-                x = x + (s_hat ** 2 - s_cur ** 2).sqrt() * S_noise * torch.randn_like(x)
+                if generators is not None:
+                    noise_list = [torch.randn(single_shape, device=device, generator=g) for g in generators]
+                    noise = torch.cat(noise_list, dim=0)
+                else:
+                    noise = torch.randn_like(x)
+                x = x + (s_hat ** 2 - s_cur ** 2).sqrt() * S_noise * noise
+                
             sig = torch.full((shape[0],), float(s_hat), device=device)
             d = self.precond(x, sig, cond=cond)
             dx = (x - d) / s_hat
             x_next = x + (s_next - s_hat) * dx
+            
             if s_next > 0:  # 2nd-order correction
                 sig2 = torch.full((shape[0],), float(s_next), device=device)
                 d2 = self.precond(x_next, sig2, cond=cond)

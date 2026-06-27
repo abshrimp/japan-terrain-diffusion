@@ -10,12 +10,13 @@ Three modes:
   * default        coarse -> post-select by land area -> SR -> save final islands.
   * --coarse-only  mass-produce coarse drafts (fast, no SR): saves each coarse DEM
                    (.npy) + a preview PNG + a labelled contact_sheet.png for browsing.
+                   [Feature: Resumable, Batched & Reproducible. Optimized for high-speed drafting.]
   * --complete DIR finish chosen coarse drafts from a --coarse-only run through SR.
 
-  # browse: make 100 coarse drafts
+  # browse: make 100 coarse drafts (FAST mode)
   python src/generate.py --config configs/phase1.yaml \
       --coarse-ckpt checkpoints/phase1/coarse/latest.pt \
-      --coarse-only --n 100 --out outputs/drafts
+      --coarse-only --n 100 --batch-size 16 --out outputs/drafts
   # complete the ones you like (by id substring) at full resolution
   python src/generate.py --config configs/phase1.yaml \
       --sr-ckpt checkpoints/phase1/sr/latest.pt \
@@ -92,44 +93,95 @@ def grid_params(cfg, args):
     g = cfg["geometry"]
     res = cfg["data"]["res_m"]
     canvas_px = args.canvas_px or g["canvas_px"]
-    coarse_px = canvas_px // (g["canvas_px"] // g["coarse_px"])
+    coarse_px = args.coarse_px or canvas_px // (g["canvas_px"] // g["coarse_px"])
     coarse_res = res * (canvas_px // coarse_px)
     return canvas_px, coarse_px, coarse_res
 
 
 # ----------------------------- coarse drafting ----------------------------- #
-def gen_coarse_candidates(coarse, cfg, args, coarse_px, coarse_res):
-    """Sample args.n coarse drafts; return list of dicts (dem_c + land stats)."""
+def gen_coarse_candidates(coarse, cfg, args, coarse_px, coarse_res, out_dir=None):
+    """Sample args.n coarse drafts in batches; return list of dicts (dem_c + land stats)."""
     vmax, nm = cfg["data"]["vmax"], cfg["data"].get("norm", "sqrt")
-    cstep = args.coarse_steps or cfg["coarse"]["sample"]["steps"]
+    
+    cstep = args.coarse_steps
+    if cstep == 0:
+        if args.coarse_only:
+            cstep = 15
+            print(f"  [coarse] auto-reduced steps to {cstep} for fast drafting.")
+        else:
+            cstep = cfg["coarse"]["sample"]["steps"]
+
     cands = []
-    with torch.cuda.amp.autocast(dtype=torch.float16):
-        for i in range(args.n):
-            x = coarse.sample((1, 1, coarse_px, coarse_px), "cuda",
-                              steps=cstep, seed=args.seed + i)
-            dem_c = denormalize(x[0, 0].float().cpu().numpy(), vmax, nm)
+    existing_seeds = {}
+    if out_dir is not None and out_dir.exists():
+        for p in out_dir.glob("coarse_*_seed*.npy"):
+            try:
+                s_str = [x for x in p.stem.split("_") if x.startswith("seed")][0]
+                seed_val = int(s_str.replace("seed", ""))
+                existing_seeds[seed_val] = p
+            except Exception:
+                pass
+
+    missing_tasks = []
+    for i in range(args.n):
+        current_seed = args.seed + i
+        current_idx = args.seed + i
+        if current_seed in existing_seeds:
+            p = existing_seeds[current_seed]
+            dem_c = np.load(p).astype(np.float32)
             lcc, frac = largest_component_km2(dem_c, coarse_res)
-            cands.append({"idx": i, "seed": args.seed + i, "dem_c": dem_c,
+            cands.append({"idx": current_idx, "seed": current_seed, "dem_c": dem_c,
                           "lcc_km2": lcc, "frac": frac,
-                          "total_km2": land_km2(dem_c, coarse_res)})
-            if (i + 1) % 10 == 0 or i + 1 == args.n:
-                print(f"  [coarse] {i+1}/{args.n}", flush=True)
+                          "total_km2": land_km2(dem_c, coarse_res),
+                          "tag": p.stem})
+        else:
+            missing_tasks.append((current_idx, current_seed))
+
+    if missing_tasks:
+        print(f"  [coarse] loaded {len(existing_seeds)} existing. generating {len(missing_tasks)} new drafts in batches of {args.batch_size}...")
+
+    batch_size = args.batch_size
+    with torch.cuda.amp.autocast(dtype=torch.float16):
+        for b_start in range(0, len(missing_tasks), batch_size):
+            batch_tasks = missing_tasks[b_start : b_start + batch_size]
+            b_len = len(batch_tasks)
+            
+            batch_seeds = [task[1] for task in batch_tasks]
+            x = coarse.sample((b_len, 1, coarse_px, coarse_px), "cuda",
+                              steps=cstep, seed=batch_seeds)
+            
+            for k, (idx, seed) in enumerate(batch_tasks):
+                dem_c = denormalize(x[k, 0].float().cpu().numpy(), vmax, nm)
+                lcc, frac = largest_component_km2(dem_c, coarse_res)
+                cand = {"idx": idx, "seed": seed, "dem_c": dem_c,
+                        "lcc_km2": lcc, "frac": frac,
+                        "total_km2": land_km2(dem_c, coarse_res)}
+                cands.append(cand)
+                
+                if out_dir is not None:
+                    save_coarse_draft(cand, out_dir, coarse_res, vmax)
+                    
+            print(f"  [coarse] processed batch {b_start//batch_size + 1}/{(len(missing_tasks)+batch_size-1)//batch_size}", flush=True)
+            
     return cands
 
 
 def save_coarse_draft(cand, out, coarse_res, vmax):
-    """Save a coarse draft: .npy DEM (to complete later) + shaded-relief preview PNG."""
-    tag = f"coarse_{cand['idx']:03d}_seed{cand['seed']}_{round(cand['lcc_km2'])}km2"
-    np.save(out / f"{tag}.npy", cand["dem_c"].astype(np.float32))
-    save_png(shaded_relief(cand["dem_c"], res=coarse_res, vmax=vmax),
-             out / f"{tag}.png")
+    tag = cand.get("tag", f"coarse_{cand['idx']:03d}_seed{cand['seed']}_{round(cand['lcc_km2'])}km2")
+    npy_path = out / f"{tag}.npy"
+    png_path = out / f"{tag}.png"
+    
+    if not npy_path.exists():
+        np.save(npy_path, cand["dem_c"].astype(np.float32))
+    if not png_path.exists():
+        save_png(shaded_relief(cand["dem_c"], res=coarse_res, vmax=vmax), png_path)
+        
     return {"tag": tag, "idx": cand["idx"], "seed": cand["seed"],
             "lcc_km2": round(cand["lcc_km2"], 1), "frac": round(cand["frac"], 2),
             "total_km2": round(cand["total_km2"], 1), "npy": f"{tag}.npy"}
 
 
 def contact_sheet(recs, out, coarse_res, vmax, cols=8, batch_size=100):
-    """Labelled montage of coarse drafts for quick visual browsing, batched per batch_size."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -170,7 +222,6 @@ def contact_sheet(recs, out, coarse_res, vmax, cols=8, batch_size=100):
 
 # ----------------------------- SR finishing ----------------------------- #
 def finish_island(sr, dem_c, seed, rank, cfg, args, out, canvas_px):
-    """Upsample a coarse DEM -> SR refine (one full-canvas pass) -> optional hydro -> save."""
     vmax, nm = cfg["data"]["vmax"], cfg["data"].get("norm", "sqrt")
     res, sea = cfg["data"]["res_m"], cfg["data"].get("sea_thresh", 0.5)
     sstep = args.sr_steps or cfg["sr"]["sample"]["steps"]
@@ -211,12 +262,11 @@ def finish_island(sr, dem_c, seed, rank, cfg, args, out, canvas_px):
 
 
 def load_drafts(draft_dir, picks):
-    """Load coarse drafts from a --coarse-only run, optionally filtered by --pick tokens."""
     draft_dir = Path(draft_dir)
     man_path = draft_dir / "coarse_manifest.json"
     if man_path.exists():
         recs = json.loads(man_path.read_text())
-    else:  # fall back to globbing
+    else:
         recs = []
         for p in sorted(draft_dir.glob("coarse_*.npy")):
             recs.append({"tag": p.stem, "npy": p.name,
@@ -235,6 +285,10 @@ def main():
     ap.add_argument("--coarse-ckpt", default="")
     ap.add_argument("--sr-ckpt", default="")
     ap.add_argument("--n", type=int, default=16, help="coarse candidates / drafts")
+    
+    ap.add_argument("--batch-size", type=int, default=1, help="batch size for coarse generation (speed up)")
+    ap.add_argument("--coarse-px", type=int, default=0, help="override coarse resolution for faster drafting")
+    
     ap.add_argument("--keep", type=int, default=4, help="how many to SR + save (default mode)")
     ap.add_argument("--target-km2", type=float, default=5000.0)
     ap.add_argument("--tol-km2", type=float, default=1000.0)
@@ -244,14 +298,12 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="outputs/generated")
     ap.add_argument("--no-ema", action="store_true")
-    # two-phase browsing workflow
     ap.add_argument("--coarse-only", action="store_true",
                     help="STAGE 1 ONLY: mass-produce coarse drafts (no SR) for browsing")
     ap.add_argument("--complete", default="",
                     help="STAGE 2: finish coarse drafts from this --coarse-only dir via SR")
     ap.add_argument("--pick", nargs="+", default=None,
                     help="with --complete: id substrings to finish (e.g. 003 041); all if omitted")
-    # hydrological conditioning
     ap.add_argument("--hydro", action="store_true",
                     help="fill depressions so the island drains to the sea")
     ap.add_argument("--hydro-epsilon", type=float, default=1e-3,
@@ -269,7 +321,6 @@ def main():
     vmax = cfg["data"]["vmax"]
     canvas_px, coarse_px, coarse_res = grid_params(cfg, args)
 
-    # ---------------- STAGE 2: complete chosen drafts ---------------- #
     if args.complete:
         if not args.sr_ckpt:
             raise SystemExit("--complete needs --sr-ckpt")
@@ -285,19 +336,29 @@ def main():
         print(f"[done] wrote {len(results)} islands to {out}")
         return
 
-    # ---------------- STAGE 1: coarse drafts (browse or full pipeline) ---------------- #
     if not args.coarse_ckpt:
         raise SystemExit("need --coarse-ckpt (or use --complete with --sr-ckpt)")
     coarse, _, cs = load_stage(args.coarse_ckpt, device, use_ema=not args.no_ema)
     print(f"[coarse] loaded (step {cs}); sampling {args.n} drafts at "
           f"{coarse_px}px ({coarse_res:.0f} m/px)")
-    cands = gen_coarse_candidates(coarse, cfg, args, coarse_px, coarse_res)
+          
+    out_dir_for_coarse = out if args.coarse_only else None
+    cands = gen_coarse_candidates(coarse, cfg, args, coarse_px, coarse_res, out_dir=out_dir_for_coarse)
+    
     lccs = sorted(c["lcc_km2"] for c in cands)
     print(f"[coarse] largest-island km2 dist: min={lccs[0]:.0f} "
           f"med={lccs[len(lccs)//2]:.0f} max={lccs[-1]:.0f}")
 
     if args.coarse_only:
-        recs = [save_coarse_draft(c, out, coarse_res, vmax) for c in cands]
+        recs = []
+        for c in cands:
+            tag = c.get("tag") or f"coarse_{c['idx']:03d}_seed{c['seed']}_{round(c['lcc_km2'])}km2"
+            recs.append({
+                "tag": tag, "idx": c["idx"], "seed": c["seed"],
+                "lcc_km2": round(c["lcc_km2"], 1), "frac": round(c["frac"], 2),
+                "total_km2": round(c["total_km2"], 1), "npy": f"{tag}.npy"
+            })
+            
         recs.sort(key=lambda r: r["idx"])
         (out / "coarse_manifest.json").write_text(json.dumps(recs, indent=2))
         contact_sheet(recs, out, coarse_res, vmax, batch_size=100)
@@ -309,7 +370,6 @@ def main():
               f"--complete {out} --pick <ids...> --out outputs/final")
         return
 
-    # default: post-select by largest-island area, then SR the keepers
     for c in cands:
         c["score"] = abs(c["lcc_km2"] - args.target_km2) + (1 - c["frac"]) * args.target_km2 * 0.3
     cands.sort(key=lambda c: c["score"])
