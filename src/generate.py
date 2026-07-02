@@ -24,6 +24,7 @@ Three modes:
 """
 import argparse
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -41,8 +42,7 @@ from dataset import denormalize, normalize  # noqa
 from render import shaded_relief, hillshade, color_relief, save_png  # noqa
 from hydro import fill_depressions, flow_accumulation, drainage_overlay  # noqa
 
-DST_CRS = ("+proj=lcc +lat_1=33 +lat_2=45 +lat_0=38 +lon_0=137 "
-           "+x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+DST_CRS = "EPSG:3857"
 
 
 def load_stage(ckpt_path, device, use_ema=True):
@@ -79,9 +79,17 @@ def largest_component_km2(dem_m, res, sea_thresh=0.5):
     return km2, frac
 
 
-def save_geotiff(dem_m, path, res):
+def save_geotiff(dem_m, path, res, args):
     h, w = dem_m.shape
-    transform = Affine(res, 0, 0, 0, -res, 0)
+
+    R = 6378137.0
+    center_x = math.radians(args.center_coords[1]) * R
+    center_y = math.log(math.tan(math.pi / 4.0 + math.radians(args.center_coords[0]) / 2.0)) * R
+    top_left_x = center_x - (w * res) / 2.0
+    top_left_y = center_y + (h * res) / 2.0
+    
+    transform = Affine(res, 0, top_left_x, 0, -res, top_left_y)
+    
     prof = {"driver": "GTiff", "dtype": "float32", "count": 1, "height": h,
             "width": w, "crs": DST_CRS, "transform": transform,
             "compress": "deflate", "predictor": 2}
@@ -244,7 +252,7 @@ def finish_island(sr, dem_c, seed, rank, cfg, args, out, canvas_px):
     total_km2 = land_km2(dem, res)
     lcc_km2, frac = largest_component_km2(dem, res)
     tag = f"island_{rank:02d}_seed{seed}_{round(lcc_km2)}km2"
-    save_geotiff(dem, out / f"{tag}.tif", res)
+    save_geotiff(dem, out / f"{tag}.tif", res, args)
     save_png(shaded_relief(dem, res=res, vmax=vmax), out / f"{tag}_shaded.png")
     save_png(hillshade(dem, res=res), out / f"{tag}_hillshade.png")
     save_png(color_relief(dem, vmax=vmax), out / f"{tag}_color.png")
@@ -310,6 +318,8 @@ def main():
                     help="m of drainage gradient across flats (0 = flat fill, faster)")
     ap.add_argument("--hydro-drainage", action="store_true",
                     help="also save a D8 river-network overlay (implies --hydro)")
+    ap.add_argument("--center-coords", nargs=2, type=float, default=(32.234853, 129.372722),
+                    help="Override the center coordinates (lat, lon) for the generated island")
     args = ap.parse_args()
     if args.hydro_drainage:
         args.hydro = True
